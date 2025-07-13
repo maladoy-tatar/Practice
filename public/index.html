@@ -5,10 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Event Manager</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+  <script>
+    emailjs.init('JThbHT-as-I9yuE1d');
+  </script>
 </head>
 <body>
   <header>
     <h1>Event Manager</h1>
+    <nav>
+      <button id="loginBtn">Вход</button>
+      <button id="registerBtn">Регистрация</button>
+      <div id="userInfo" style="display:none;">
+        <span>Вы вошли как: <span id="userEmailDisplay"></span></span>
+        <button id="logoutBtn">Выйти</button>
+      </div>
+    </nav>
   </header>
 
   <main>
@@ -16,8 +28,27 @@
       <h2>Предстоящие мероприятия</h2>
       <div id="eventsList"></div>
     </section>
+    
+    <section id="userRegistrationSection" style="display:none;">
+      <h2>Регистрация пользователя</h2>
+      <form id="userRegistrationForm">
+        <input type="email" id="userEmail" placeholder="Ваш email" required>
+        <input type="password" id="userPassword" placeholder="Пароль" required>
+        <button type="submit">Зарегистрироваться</button>
+      </form>
+    </section>
+    
+    <section id="registrationSection" style="display:none;">
+      <h2>Запись на мероприятие</h2>
+      <form id="registrationForm">
+        <input type="email" id="regEmail" placeholder="Ваш email" required>
+        <button type="submit">Записаться</button>
+      </form>
+    </section>
   </main>
 
-  <script src="script.js"></script>
+  <script src="script.js">
+    
+  </script>
 </body>
 </html>

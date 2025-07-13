@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Panel</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Панель администратора</h1>
+    <div id="userInfo">
+      <span>Вы вошли как: <span id="userEmailDisplay">admin@example.com</span></span>
+      <button id="logoutBtn">Выйти</button>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>Создать мероприятие</h2>
+      <form id="createEventForm">
+        <input type="text" id="eventName" placeholder="Название" required>
+        <div style="display: flex; gap: 10px;">
+          <input type="date" id="eventDate" required style="flex: 1;">
+          <input type="time" id="eventTime" required style="flex: 1;">
+        </div>
+        <input type="text" id="eventLocation" placeholder="Место" required>
+        <input type="number" id="eventCapacity" placeholder="Количество мест" min="1" required>
+        <textarea id="eventDescription" placeholder="Описание"></textarea>
+        <button type="submit">Создать</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>Текущие мероприятия</h2>
+      <div id="adminEventsList"></div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>

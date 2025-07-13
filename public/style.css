@@ -113,22 +113,44 @@ input, textarea {
   margin-bottom: 1.5rem;
   color: var(--primary);
 }
+#userRegistrationSection {
+  max-width: 500px;
+  margin: 0 auto;
+}
 
+#userRegistrationForm {
+  display: grid;
+  gap: 1rem;
+}
 
 #userInfo {
   display: flex;
   align-items: center;
   gap: 15px;
 }
-.event-reg-form {
-  display: flex;
-  gap: 10px;
-  margin-top: 15px;
+
+#userInfo span {
+  color: white;
+  font-size: 0.9rem;
 }
 
-.event-reg-form input {
+#userEmailDisplay {
+  font-weight: bold;
+}
+
+#logoutBtn {
+  background: #e74c3c;
+}
+
+#logoutBtn:hover {
+  background: #c0392b;
+}
+#createEventForm > div {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 1rem;
+}
+
+#createEventForm > div > input {
   flex: 1;
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
 }
