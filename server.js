@@ -4,26 +4,10 @@ const app = express();
 const port = 3000;
 
 // Временное хранилище данных
-let events = [
-  {
-    id: 1,
-    name: "Конференция по веб-разработке",
-    date: "2024-06-15",
-    location: "Москва, ул. Пушкина, д.10",
-    capacity: 100,
-    description: "Ежегодная конференция для веб-разработчиков",
-    participants: []
-  },
-  {
-    id: 2,
-    name: "Воркшоп по JavaScript",
-    date: "2024-07-20",
-    location: "Онлайн",
-    capacity: 50,
-    description: "Практический воркшоп по современному JavaScript",
-    participants: []
-  }
-];
+let events = [];
+let users = [];
+const adminUser = { id: 1, email: 'admin@example.com', password: 'admin123', role: 'admin' };
+users.push(adminUser);
 
 app.use(bodyParser.json());
 app.use(express.static('public'));
@@ -31,6 +15,45 @@ app.use(express.static('public'));
 // API для мероприятий
 app.get('/api/events', (req, res) => {
   res.json(events);
+});
+
+app.post('/api/events', (req, res) => {
+  const event = req.body;
+  
+  // Проверка 1: Дата должна быть в будущем
+  const eventDate = new Date(event.date);
+  const now = new Date();
+  if (eventDate <= now) {
+    return res.status(400).json({ error: 'Дата мероприятия должна быть в будущем' });
+  }
+
+  // Проверка 2: Одно место и время
+  const sameTimePlaceEvent = events.find(e => 
+    e.location === event.location && 
+    new Date(e.date).getTime() === eventDate.getTime()
+  );
+  if (sameTimePlaceEvent) {
+    return res.status(400).json({ error: 'Мероприятие в этом месте и в это время уже существует' });
+  }
+
+  // Проверка 3: Разница менее часа
+  const oneHour = 60 * 60 * 1000; // 1 час в миллисекундах
+  const conflictingEvent = events.find(e => {
+    if (e.location !== event.location) return false;
+    const eTime = new Date(e.date).getTime();
+    const diff = Math.abs(eTime - eventDate.getTime());
+    return diff < oneHour;
+  });
+
+  if (conflictingEvent) {
+    return res.status(400).json({ error: 'Найдено конфликтующее мероприятие (разница менее 1 часа)' });
+  }
+
+  // Если проверки пройдены, создаем мероприятие
+  event.id = Date.now();
+  event.participants = [];
+  events.push(event);
+  res.status(201).json(event);
 });
 
 // API для регистрации на событие
@@ -50,9 +73,53 @@ app.post('/api/events/:id/register', (req, res) => {
   }
   
   event.participants.push(email);
-  res.json({ message: 'Регистрация успешна' });
+  res.json({ 
+    message: 'Регистрация успешна' ,
+    event: {
+      id: event.id,
+      name: event.name,
+      date: event.date,
+      location: event.location,
+      description: event.description || ''
+    }
+  });
+});
+
+// API для аутентификации
+app.post('/api/login', (req, res) => {
+  const { email, password } = req.body;
+  const user = users.find(u => u.email === email && u.password === password);
+  
+  if (user) {
+    res.json({ 
+      id: user.id,
+      email: user.email,
+      role: user.role 
+    });
+  } else {
+    res.status(401).send('Invalid credentials');
+  }
+});
+
+// API для регистрации пользователя
+app.post('/api/register', (req, res) => {
+  const { email, password } = req.body;
+  
+  if (users.some(u => u.email === email)) {
+    return res.status(400).send('User already exists');
+  }
+  
+  const newUser = { 
+    id: Date.now(), 
+    email, 
+    password, 
+    role: 'user' 
+  };
+  
+  users.push(newUser);
+  res.status(201).json({ id: newUser.id, email: newUser.email });
 });
 
 app.listen(port, () => {
-  console.log(`Сервер запущен на http://localhost:${port}`);
+  console.log(`Server running at http://localhost:${port}`);
 });

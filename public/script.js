@@ -1,69 +1,406 @@
+// Глобальная переменная для текущего пользователя
+let currentUser = null;
+
 document.addEventListener('DOMContentLoaded', () => {
-  loadEvents();
+  // Проверяем сохраненного пользователя
+  const savedUser = sessionStorage.getItem('currentUser');
+  if (savedUser) {
+    currentUser = JSON.parse(savedUser);
+    updateAuthUI();
+  }
+  
+  // Общие элементы
+  const loginBtn = document.getElementById('loginBtn');
+  const registerBtn = document.getElementById('registerBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
+  
+  // Обработчики
+  if (loginBtn) loginBtn.addEventListener('click', () => window.location.href = 'login.html');
+  if (registerBtn) registerBtn.addEventListener('click', showUserRegistration);
+  if (logoutBtn) logoutBtn.addEventListener('click', logout);
+  
+  // Главная страница
+  if (document.getElementById('eventsList')) {
+    loadEvents();
+    
+    // Обработчики форм
+    const userRegForm = document.getElementById('userRegistrationForm');
+    if (userRegForm) userRegForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      registerUser();
+    });
+    
+    const eventRegForm = document.getElementById('registrationForm');
+    if (eventRegForm) eventRegForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const eventId = document.getElementById('registrationSection').dataset.eventId;
+      if (eventId) registerForEvent(parseInt(eventId));
+    });
+  }
+  
+  // Панель администратора
+  if (document.getElementById('createEventForm')) {
+    // Установка минимальной даты (завтра)
+    const dateInput = document.getElementById('eventDate');
+    if (dateInput) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      dateInput.min = tomorrow.toISOString().split('T')[0];
+    }
+    
+    loadAdminEvents();
+    
+    document.getElementById('createEventForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      createEvent();
+    });
+  }
+  
+  // Страница входа
+  if (document.getElementById('loginForm')) {
+    document.getElementById('loginForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      loginUser();
+    });
+  }
 });
 
+// Обновление UI в зависимости от состояния аутентификации
+function updateAuthUI() {
+  const loginBtn = document.getElementById('loginBtn');
+  const registerBtn = document.getElementById('registerBtn');
+  const userInfo = document.getElementById('userInfo');
+  const userEmailDisplay = document.getElementById('userEmailDisplay');
+  
+  if (currentUser) {
+    // Скрываем кнопки входа/регистрации, показываем информацию о пользователе
+    if (loginBtn) loginBtn.style.display = 'none';
+    if (registerBtn) registerBtn.style.display = 'none';
+    if (userInfo) userInfo.style.display = 'flex';
+    if (userEmailDisplay) userEmailDisplay.textContent = currentUser.email;
+  } else {
+    // Показываем кнопки входа/регистрации, скрываем информацию о пользователе
+    if (loginBtn) loginBtn.style.display = 'block';
+    if (registerBtn) registerBtn.style.display = 'block';
+    if (userInfo) userInfo.style.display = 'none';
+  }
+}
+
+// Выход пользователя
+function logout() {
+  currentUser = null;
+  sessionStorage.removeItem('currentUser');
+  updateAuthUI();
+  
+  if (window.location.pathname.includes('admin.html')) {
+    window.location.href = 'index.html';
+  } else {
+    window.location.reload();
+  }
+}
+
+// ===== ФУНКЦИИ ДЛЯ ПОЛЬЗОВАТЕЛЕЙ =====
+
 // Загрузка мероприятий
-async function loadEvents() {
+// Обновленная функция loadEvents() для отображения времени
+    async function loadEvents() {
+      try {
+        const response = await fetch('/api/events');
+        const events = await response.json();
+        
+        const eventsList = document.getElementById('eventsList');
+        if (!eventsList) return;
+        
+        eventsList.innerHTML = '';
+        
+        events.forEach(event => {
+          const eventDate = new Date(event.date);
+          const formattedDate = eventDate.toLocaleDateString();
+          const formattedTime = eventDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+          
+          const eventElement = document.createElement('div');
+          eventElement.className = 'event-card';
+          eventElement.innerHTML = `
+            <h3>${event.name}</h3>
+            <p><strong>Дата и время:</strong> ${formattedDate} в ${formattedTime}</p>
+            <p><strong>Место:</strong> ${event.location}</p>
+            <p><strong>Описание:</strong> ${event.description}</p>
+            <p><strong>Свободных мест:</strong> ${event.capacity - event.participants.length}</p>
+            <button onclick="showRegistration(${event.id})">Записаться на мероприятие</button>
+          `;
+          eventsList.appendChild(eventElement);
+        });
+      } catch (error) {
+        console.error('Error loading events:', error);
+      }
+    }
+
+// Показать форму записи на мероприятие или записать сразу
+function showRegistration(eventId) {
+  // Если пользователь авторизован - записать сразу
+  if (currentUser) {
+    registerForEvent(eventId);
+    return;
+  }
+  
+  // Иначе показать форму
+  const regSection = document.getElementById('registrationSection');
+  if (!regSection) return;
+  
+  regSection.style.display = 'block';
+  regSection.dataset.eventId = eventId;
+  
+  window.scrollTo({
+    top: regSection.offsetTop,
+    behavior: 'smooth'
+  });
+}
+
+// Запись на мероприятие
+async function registerForEvent(eventId) {
+  let email = '';
+  
+  // Если пользователь авторизован - использовать его email
+  if (currentUser) {
+    email = currentUser.email;
+  } else {
+    // Иначе взять из формы
+    email = document.getElementById('regEmail').value;
+  }
+  
+  if (!email) {
+    alert('Пожалуйста, введите email');
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/api/events/${eventId}/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+
+      try {
+        const eventDetails = result.event;
+        
+        // Отправляем письмо
+        await emailjs.send(
+          'service_tapl1t8',
+          'template_cvlqxhs',  
+          {
+            to_email: email,
+            event_name: eventDetails.name,
+            event_date: new Date(eventDetails.date).toLocaleDateString(),
+            event_location: eventDetails.location,
+            event_description: eventDetails.description
+          });
+        alert(`Вы успешно записаны на мероприятие "${eventDetails.name}"!\nПисьмо с подтверждением отправлено на ${email}`);
+      } catch(emailError){
+        console.error('Ошибка отправки письма:', emailError);
+        alert(`Вы записаны на мероприятие, но не получили письмо: ${emailError.text}`)
+      }
+      
+      const regSection = document.getElementById('registrationSection');
+      if (regSection) regSection.style.display = 'none';
+      
+      // Обновляем список мероприятий
+      loadEvents();
+    } else {
+      const error = await response.text();
+      alert(`Ошибка: ${error}`);
+    }
+  } catch (error) {
+    console.error('Registration error:', error);
+    alert('Ошибка сети. Попробуйте позже.');
+  }
+}
+
+// Показать форму регистрации пользователя
+function showUserRegistration() {
+  const userRegSection = document.getElementById('userRegistrationSection');
+  if (userRegSection) {
+    userRegSection.style.display = 'block';
+    window.scrollTo({
+      top: userRegSection.offsetTop,
+      behavior: 'smooth'
+    });
+  }
+}
+
+// Регистрация нового пользователя
+async function registerUser() {
+  const email = document.getElementById('userEmail').value;
+  const password = document.getElementById('userPassword').value;
+  
+  if (!email || !password) {
+    alert('Пожалуйста, заполните все поля');
+    return;
+  }
+  
+  try {
+    const response = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    
+    if (response.ok) {
+      alert('Регистрация успешна! Теперь вы можете войти в систему.');
+      document.getElementById('userRegistrationSection').style.display = 'none';
+      document.getElementById('userEmail').value = '';
+      document.getElementById('userPassword').value = '';
+    } else {
+      const error = await response.text();
+      alert(`Ошибка: ${error}`);
+    }
+  } catch (error) {
+    console.error('Registration error:', error);
+    alert('Ошибка сети. Попробуйте позже.');
+  }
+}
+
+// Вход пользователя
+async function loginUser() {
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+  
+  if (!email || !password) {
+    alert('Пожалуйста, заполните все поля');
+    return;
+  }
+  
+  try {
+    const response = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    
+    if (response.ok) {
+      const user = await response.json();
+      
+      // Сохраняем пользователя
+      currentUser = user;
+      sessionStorage.setItem('currentUser', JSON.stringify(user));
+      
+      if (user.role === 'admin') {
+        window.location.href = 'admin.html';
+      } else {
+        // Перенаправляем на главную страницу
+        window.location.href = 'index.html';
+      }
+    } else {
+      const error = await response.text();
+      alert(`Ошибка входа: ${error}`);
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    alert('Ошибка сети. Попробуйте позже.');
+  }
+}
+
+// ===== ФУНКЦИИ ДЛЯ АДМИНИСТРАТОРА =====
+
+// Создание мероприятия
+async function createEvent() {
+  const date = document.getElementById('eventDate').value;
+  const time = document.getElementById('eventTime').value;
+  
+  // Собираем полную дату и время
+  const dateTime = `${date}T${time}:00`;
+  const eventData = {
+    name: document.getElementById('eventName').value,
+    date: dateTime,
+    location: document.getElementById('eventLocation').value,
+    capacity: parseInt(document.getElementById('eventCapacity').value),
+    description: document.getElementById('eventDescription').value
+  };
+  
+  if (!eventData.name || !date || !time || !eventData.location || !eventData.capacity) {
+    alert('Пожалуйста, заполните все обязательные поля');
+    return;
+  }
+  
+  try {
+    const response = await fetch('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(eventData)
+    });
+    
+    if (response.ok) {
+      alert('Мероприятие создано!');
+      document.getElementById('createEventForm').reset();
+      loadAdminEvents();
+    } else {
+      let errorText;
+      try {
+        // Пытаемся получить JSON с ошибкой
+        const errorData = await response.json();
+        errorText = errorData.error;
+      } catch (e) {
+        // Если не JSON, то читаем как текст
+        errorText = await response.text();
+      }
+      alert(`Ошибка: ${errorText}`);
+    }
+  } catch (error) {
+    console.error('Event creation error:', error);
+    alert('Ошибка сети. Попробуйте позже.');
+  }
+}
+
+// Загрузка мероприятий для админа
+async function loadAdminEvents() {
   try {
     const response = await fetch('/api/events');
     const events = await response.json();
     
-    const eventsList = document.getElementById('eventsList');
+    const eventsList = document.getElementById('adminEventsList');
     if (!eventsList) return;
     
     eventsList.innerHTML = '';
     
     events.forEach(event => {
+      const eventDate = new Date(event.date);
+      const formattedDate = eventDate.toLocaleDateString();
+      const formattedTime = eventDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
       const eventElement = document.createElement('div');
       eventElement.className = 'event-card';
       eventElement.innerHTML = `
         <h3>${event.name}</h3>
-        <p><strong>Дата:</strong> ${new Date(event.date).toLocaleDateString()}</p>
+        <p><strong>Дата:</strong> ${formattedDate} в ${formattedTime}</p>
         <p><strong>Место:</strong> ${event.location}</p>
-        <p><strong>Описание:</strong> ${event.description}</p>
-        <p><strong>Свободных мест:</strong> ${event.capacity - event.participants.length}</p>
-        <form class="event-reg-form" data-event-id="${event.id}">
-          <input type="email" placeholder="Ваш email" required>
-          <button type="submit">Записаться</button>
-        </form>
+        <p><strong>Участники:</strong> ${event.participants.length}/${event.capacity}</p>
+        <button onclick="viewParticipants(${event.id})">Показать участников</button>
       `;
       eventsList.appendChild(eventElement);
     });
-
-    // Добавляем обработчики для форм регистрации
-    document.querySelectorAll('.event-reg-form').forEach(form => {
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const eventId = form.dataset.eventId;
-        const email = form.querySelector('input').value;
-        
-        if (!email) {
-          alert('Пожалуйста, введите email');
-          return;
-        }
-        
-        try {
-          const response = await fetch(`/api/events/${eventId}/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email })
-          });
-          
-          if (response.ok) {
-            alert('Вы успешно записаны на мероприятие!');
-            form.reset();
-            loadEvents();
-          } else {
-            const error = await response.text();
-            alert(`Ошибка: ${error}`);
-          }
-        } catch (error) {
-          console.error('Registration error:', error);
-          alert('Ошибка сети. Попробуйте позже.');
-        }
-      });
-    });
   } catch (error) {
     console.error('Error loading events:', error);
+  }
+}
+
+// Просмотр участников мероприятия
+async function viewParticipants(eventId) {
+  try {
+    const response = await fetch('/api/events');
+    const events = await response.json();
+    const event = events.find(e => e.id === eventId);
+    
+    if (event) {
+      const participants = event.participants.length > 0 
+        ? event.participants.join('\n') 
+        : 'Участников пока нет';
+      alert(`Участники мероприятия "${event.name}":\n\n${participants}`);
+    } else {
+      alert('Мероприятие не найдено');
+    }
+  } catch (error) {
+    console.error('Error loading participants:', error);
+    alert('Ошибка загрузки участников');
   }
 }
