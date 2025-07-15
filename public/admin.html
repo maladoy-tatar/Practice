@@ -19,10 +19,21 @@
       <h2>Создать мероприятие</h2>
       <form id="createEventForm">
         <input type="text" id="eventName" placeholder="Название" required>
-        <div style="display: flex; gap: 10px;">
-          <input type="date" id="eventDate" required style="flex: 1;">
-          <input type="time" id="eventTime" required style="flex: 1;">
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 1rem;">
+          <div style="flex: 1;">
+            <label>Начало:</label>
+            <input type="date" id="eventDate" required>
+            <input type="time" id="eventTime" required>
+          </div>
+          
+          <div style="flex: 1;">
+            <label>Окончание:</label>
+            <input type="date" id="eventEndDate" required>
+            <input type="time" id="eventEndTime" required>
+          </div>
         </div>
+        
         <input type="text" id="eventLocation" placeholder="Место" required>
         <input type="number" id="eventCapacity" placeholder="Количество мест" min="1" required>
         <textarea id="eventDescription" placeholder="Описание"></textarea>

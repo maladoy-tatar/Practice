@@ -20,33 +20,58 @@ app.get('/api/events', (req, res) => {
 app.post('/api/events', (req, res) => {
   const event = req.body;
   
-  // Проверка 1: Дата должна быть в будущем
-  const eventDate = new Date(event.date);
+  // Проверка 1: Дата начала должна быть в будущем
+  const eventStart = new Date(event.date);
+  const eventEnd = new Date(event.endDate);
   const now = new Date();
-  if (eventDate <= now) {
-    return res.status(400).json({ error: 'Дата мероприятия должна быть в будущем' });
+  
+  if (eventStart <= now) {
+    return res.status(400).json({ error: 'Дата начала мероприятия должна быть в будущем' });
   }
 
-  // Проверка 2: Одно место и время
+  // Проверка 2: Время окончания должно быть после времени начала
+  if (eventEnd <= eventStart) {
+    return res.status(400).json({ error: 'Время окончания должно быть после времени начала' });
+  }
+
+  // Проверка 3: Одно место и время
   const sameTimePlaceEvent = events.find(e => 
     e.location === event.location && 
-    new Date(e.date).getTime() === eventDate.getTime()
+    new Date(e.date).getTime() === eventStart.getTime()
   );
   if (sameTimePlaceEvent) {
     return res.status(400).json({ error: 'Мероприятие в этом месте и в это время уже существует' });
   }
 
-  // Проверка 3: Разница менее часа
+  // Проверка 4: Конфликты по времени и месту
   const oneHour = 60 * 60 * 1000; // 1 час в миллисекундах
   const conflictingEvent = events.find(e => {
     if (e.location !== event.location) return false;
-    const eTime = new Date(e.date).getTime();
-    const diff = Math.abs(eTime - eventDate.getTime());
-    return diff < oneHour;
+    
+    const eStart = new Date(e.date);
+    const eEnd = new Date(e.endDate);
+    
+    // Проверяем 4 возможных варианта конфликтов:
+    return (
+      // Новое мероприятие начинается во время существующего
+      (eventStart >= eStart && eventStart < eEnd) ||
+      
+      // Новое мероприятие заканчивается во время существующего
+      (eventEnd > eStart && eventEnd <= eEnd) ||
+      
+      // Существующее мероприятие внутри нового
+      (eventStart <= eStart && eventEnd >= eEnd) ||
+      
+      // Проверка часового промежутка между мероприятиями
+      (Math.abs(eventStart - eEnd) < oneHour) ||
+      (Math.abs(eStart - eventEnd) < oneHour)
+    );
   });
 
   if (conflictingEvent) {
-    return res.status(400).json({ error: 'Найдено конфликтующее мероприятие (разница менее 1 часа)' });
+    return res.status(400).json({ 
+      error: 'Между окончанием и началом мероприятий должен быть промежуток не менее 1 часа' 
+    });
   }
 
   // Если проверки пройдены, создаем мероприятие
@@ -79,6 +104,7 @@ app.post('/api/events/:id/register', (req, res) => {
       id: event.id,
       name: event.name,
       date: event.date,
+      endDate: event.endDate,
       location: event.location,
       description: event.description || ''
     }
@@ -106,7 +132,7 @@ app.post('/api/register', (req, res) => {
   const { email, password } = req.body;
   
   if (users.some(u => u.email === email)) {
-    return res.status(400).send('User already exists');
+    return res.status(400).send('Пользователь уже существует');
   }
   
   const newUser = { 

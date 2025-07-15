@@ -40,12 +40,16 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Панель администратора
   if (document.getElementById('createEventForm')) {
-    // Установка минимальной даты (завтра)
-    const dateInput = document.getElementById('eventDate');
-    if (dateInput) {
+    // Установка минимальной даты (завтра) для всех date-полей
+    const dateInputs = document.querySelectorAll('input[type="date"]');
+    if (dateInputs.length > 0) {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
-      dateInput.min = tomorrow.toISOString().split('T')[0];
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+      
+      dateInputs.forEach(input => {
+        input.min = tomorrowStr;
+      });
     }
     
     loadAdminEvents();
@@ -102,38 +106,41 @@ function logout() {
 // ===== ФУНКЦИИ ДЛЯ ПОЛЬЗОВАТЕЛЕЙ =====
 
 // Загрузка мероприятий
-// Обновленная функция loadEvents() для отображения времени
-    async function loadEvents() {
-      try {
-        const response = await fetch('/api/events');
-        const events = await response.json();
-        
-        const eventsList = document.getElementById('eventsList');
-        if (!eventsList) return;
-        
-        eventsList.innerHTML = '';
-        
-        events.forEach(event => {
-          const eventDate = new Date(event.date);
-          const formattedDate = eventDate.toLocaleDateString();
-          const formattedTime = eventDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-          
-          const eventElement = document.createElement('div');
-          eventElement.className = 'event-card';
-          eventElement.innerHTML = `
-            <h3>${event.name}</h3>
-            <p><strong>Дата и время:</strong> ${formattedDate} в ${formattedTime}</p>
-            <p><strong>Место:</strong> ${event.location}</p>
-            <p><strong>Описание:</strong> ${event.description}</p>
-            <p><strong>Свободных мест:</strong> ${event.capacity - event.participants.length}</p>
-            <button onclick="showRegistration(${event.id})">Записаться на мероприятие</button>
-          `;
-          eventsList.appendChild(eventElement);
-        });
-      } catch (error) {
-        console.error('Error loading events:', error);
-      }
-    }
+async function loadEvents() {
+  try {
+    const response = await fetch('/api/events');
+    const events = await response.json();
+    
+    const eventsList = document.getElementById('eventsList');
+    if (!eventsList) return;
+    
+    eventsList.innerHTML = '';
+    
+    events.forEach(event => {
+      const startDate = new Date(event.date);
+      const endDate = new Date(event.endDate);
+      
+      const formattedStartDate = startDate.toLocaleDateString();
+      const formattedStartTime = startDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      const formattedEndTime = endDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      
+      const eventElement = document.createElement('div');
+      eventElement.className = 'event-card';
+      eventElement.innerHTML = `
+        <h3>${event.name}</h3>
+        <p><strong>Начало:</strong> ${formattedStartDate} в ${formattedStartTime}</p>
+        <p><strong>Окончание:</strong> ${formattedEndTime}</p>
+        <p><strong>Место:</strong> ${event.location}</p>
+        <p><strong>Описание:</strong> ${event.description}</p>
+        <p><strong>Свободных мест:</strong> ${event.capacity - event.participants.length}</p>
+        <button onclick="showRegistration(${event.id})">Записаться на мероприятие</button>
+      `;
+      eventsList.appendChild(eventElement);
+    });
+  } catch (error) {
+    console.error('Error loading events:', error);
+  }
+}
 
 // Показать форму записи на мероприятие или записать сразу
 function showRegistration(eventId) {
@@ -306,21 +313,33 @@ async function loginUser() {
 
 // Создание мероприятия
 async function createEvent() {
-  const date = document.getElementById('eventDate').value;
-  const time = document.getElementById('eventTime').value;
+  const startDate = document.getElementById('eventDate').value;
+  const startTime = document.getElementById('eventTime').value;
+  const endDate = document.getElementById('eventEndDate').value;
+  const endTime = document.getElementById('eventEndTime').value;
   
-  // Собираем полную дату и время
-  const dateTime = `${date}T${time}:00`;
+  // Собираем полные даты и время
+  const startDateTime = `${startDate}T${startTime}:00`;
+  const endDateTime = `${endDate}T${endTime}:00`;
+  
   const eventData = {
     name: document.getElementById('eventName').value,
-    date: dateTime,
+    date: startDateTime,
+    endDate: endDateTime,
     location: document.getElementById('eventLocation').value,
     capacity: parseInt(document.getElementById('eventCapacity').value),
     description: document.getElementById('eventDescription').value
   };
   
-  if (!eventData.name || !date || !time || !eventData.location || !eventData.capacity) {
+  // Проверка обязательных полей
+  if (!eventData.name || !startDate || !startTime || !endDate || !endTime || !eventData.location || !eventData.capacity) {
     alert('Пожалуйста, заполните все обязательные поля');
+    return;
+  }
+  
+  // Проверка что время окончания после времени начала
+  if (new Date(endDateTime) <= new Date(startDateTime)) {
+    alert('Время окончания должно быть после времени начала');
     return;
   }
   
@@ -365,14 +384,20 @@ async function loadAdminEvents() {
     eventsList.innerHTML = '';
     
     events.forEach(event => {
-      const eventDate = new Date(event.date);
-      const formattedDate = eventDate.toLocaleDateString();
-      const formattedTime = eventDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      const startDate = new Date(event.date);
+      const endDate = new Date(event.endDate);
+      
+      const formattedStartDate = startDate.toLocaleDateString();
+      const formattedEndDate = endDate.toLocaleDateString();
+      const formattedStartTime = startDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      const formattedEndTime = endDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      
       const eventElement = document.createElement('div');
       eventElement.className = 'event-card';
       eventElement.innerHTML = `
         <h3>${event.name}</h3>
-        <p><strong>Дата:</strong> ${formattedDate} в ${formattedTime}</p>
+        <p><strong>Начало:</strong> ${formattedStartDate} в ${formattedStartTime}</p>
+        <p><strong>Окончание:</strong>${formattedEndDate} в ${formattedEndTime}</p>
         <p><strong>Место:</strong> ${event.location}</p>
         <p><strong>Участники:</strong> ${event.participants.length}/${event.capacity}</p>
         <button onclick="viewParticipants(${event.id})">Показать участников</button>

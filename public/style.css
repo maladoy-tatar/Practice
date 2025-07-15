@@ -37,7 +37,7 @@ nav button {
   padding: 0.5rem 1rem;
   margin-left: 0.5rem;
   border-radius: 4px;
-  cursor: pointer;
+  cursor: button;
 }
 
 main {
@@ -145,12 +145,26 @@ input, textarea {
 #logoutBtn:hover {
   background: #c0392b;
 }
+
+/* Стили для формы создания мероприятий */
 #createEventForm > div {
   display: flex;
   gap: 10px;
   margin-bottom: 1rem;
 }
 
-#createEventForm > div > input {
+#createEventForm > div > div {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+#createEventForm > div > div > input {
+  width: 100%;
+}
+
+#createEventForm label {
+  font-weight: bold;
+  font-size: 0.9rem;
 }
